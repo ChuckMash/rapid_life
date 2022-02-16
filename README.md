@@ -10,3 +10,19 @@ Run directly with python3
 
 or import
 >import rapid_life
+
+
+
+During display, keyboard and mouse supported.
+```
+ESC -> Quit
+Space -> Pause/Unpause
+c -> clear the game board
+r -> randomize the game board
+s -> export/save the game board
+l -> import/load the most recently saved game board
+enter -> Start and Stop recording video.
+```
+
+
+Mouse4 (scrollwheen button) can draw on the game board during runtime, or while paused.
