@@ -7,3 +7,6 @@ Game of Life
 
 Run directly with python3
 >python3 rapid_life.py
+
+or import
+>import rapid_life
