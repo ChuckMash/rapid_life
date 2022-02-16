@@ -25,4 +25,4 @@ enter -> Start and Stop recording video.
 ```
 
 
-Mouse4 (scrollwheen button) can draw on the game board during runtime, or while paused.
+Mouse Button 3 (scrollwheen button) can draw on the game board during runtime, or while paused.
