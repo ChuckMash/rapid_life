@@ -41,10 +41,6 @@ class rapid_life:
 
     self.actual_kernel = [[1,1,1],[1,0,1],[1,1,1]] # default
 
-    # Alternate kernels are supported experimentally
-    #self.actual_kernel = [[0,1,0,0],[1,1,0,0],[1,1,0,0],[1,1,0,0],[0,1,1,0]] # cascade
-    #self.actual_kernel = [[0,0,1,0,1],[0,1,0,0,0],[0,1,0,1,0],[0,1,0,0,0],[0,1,0,0,1]] # Slow Blob Growth
-
     ### Nothing to change here.
     self.start_time    = time.time()
     self.use_umat      = use_umat     # True/False for enable/disable cv2 UMat usage (GPU)
@@ -99,6 +95,13 @@ class rapid_life:
     if self.use_umat:
       return cv2.UMat(val)
     return val
+
+
+
+  # Experimentally updates the kernel
+  def update_kernel(self, new_actual_kernel):
+    self.actual_kernel = new_actual_kernel
+    self.kernel = self.kernel_value()
 
 
 
