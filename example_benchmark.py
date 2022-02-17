@@ -1,7 +1,9 @@
 import rapid_life
+import os
+os.environ['PYGAME_HIDE_SUPPORT_PROMPT'] = "hide"
 import pygame
 
-run_for = 500
+run_for = 1000
 
 clock = pygame.time.Clock()
 fps_log = []
