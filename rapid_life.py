@@ -1,3 +1,4 @@
+
 import time
 import os
 import random
@@ -22,10 +23,7 @@ class rapid_life:
     self.ar_bucket          = 25         # number of recent game frames to keep track of to comapre against for endgame state
     self.ar_match_limit     = 5          # number of times current game frame can appear in recent frames before calling a game over
     self.save_endgames      = False      # will save the endgame state, usefull for validating auto_restart endgame detection
-    self.kernel_rand_size   = [3, 7]     # for use with the experimentel kernel randomizer
-    self.kernel_rand_square = True       # locks the kernel randomizer to be perfect square when selecting random values
     self.recording_fps      = 60         # FPS to use when recording
-
 
     self.key_commands = { # function storage for keyboard commands, allows user to define new or override existing command callbacks
       27:  self.stop,             # ESC key, quits game
@@ -34,12 +32,8 @@ class rapid_life:
       114: self.randomize_board,  # r key, randomizes game board entirely
       115: self.save_board,       # s key
       108: self.load_board,       # l key
-      8:   self.randomize_kernel, # backspace experimental kernel randomizer
-      255: self.save_kernel,      # del saves current kernel
       13:  self.toggle_record     # enter to record / stop reccord
       }
-
-    self.actual_kernel = [[1,1,1],[1,0,1],[1,1,1]] # default
 
     ### Nothing to change here.
     self.start_time    = time.time()
@@ -55,28 +49,41 @@ class rapid_life:
     self.recording     = False
     self.video_out     = None
     self.board         = self.zero_value()
-    self.kernel        = self.kernel_value()
-    self.transforms    = [ self.zero_value() for i in range(7) ]
     self.frame_count   = 0
     self.t6_count      = 0
     self.recent_frames = deque(maxlen=self.ar_bucket)
     self.latest_save   = None
     self.save_dir      = os.path.abspath(self.save_dir)+"/"
+    self.instructions  = []
 
 
 
   # Flag setting functions
-  def stop(self):  self.stopped  = True
   def pause(self): self.paused   = not self.paused
   def clear(self): self.do_clear = True
+  def stop(self):
+    self.stopped  = True
+    if self.recording:
+      self.stop_recording()
+
+
+
+  # Adds a pair of rules and neighborhood
+  def add_instruction(self, rules=[2,3,4], neighborhood=[[1,1,1],[1,0,1],[1,1,1]]):
+    data                 = {}
+    data["rules"]        = rules
+    data["neighborhood"] = neighborhood
+    data["transforms"]   = [ self.zero_value() for i in range(7) ]
+    data["kernel"]       = np.array(neighborhood, np.uint8)
+    if self.use_umat:
+      data["kernel"] = cv2.UMat(data["kernel"])
+    self.instructions.append(data)
 
 
 
   # blank it all out
   def reset_board(self):
     self.board      = self.zero_value()
-    self.kernel     = self.kernel_value()
-    self.transforms = [ self.zero_value() for i in range(7) ]
 
 
 
@@ -86,22 +93,6 @@ class rapid_life:
     if self.use_umat:
       return cv2.UMat(val)
     return val
-
-
-
-  # Returns cv2 umat or np matrix of the generic GOL kernel
-  def kernel_value(self):
-    val = np.array(self.actual_kernel, np.uint8)
-    if self.use_umat:
-      return cv2.UMat(val)
-    return val
-
-
-
-  # Experimentally updates the kernel
-  def update_kernel(self, new_actual_kernel):
-    self.actual_kernel = new_actual_kernel
-    self.kernel = self.kernel_value()
 
 
 
@@ -117,29 +108,6 @@ class rapid_life:
   # overrides the current game board state with randomized values
   def randomize_board(self, p=None):
     self.board = self.random_value(p=p)
-
-
-
-  # experimental function for kernel randomization
-  def randomize_kernel(self):
-    if self.kernel_rand_square:
-      kx = ky = random.randint(self.kernel_rand_size[0], self.kernel_rand_size[1])
-    else:
-      kx = random.randint(self.kernel_rand_size[0], self.kernel_rand_size[1])
-      ky = random.randint(self.kernel_rand_size[0], self.kernel_rand_size[1])
-
-    self.actual_kernel = np.uint8(np.random.choice([0,1], size=(kx, ky)))
-    self.kernel = self.kernel_value()
-    print("new kernel", np.array(self.actual_kernel, np.uint8).tolist() )
-    self.randomize_board()
-
-
-
-  # experimental function to save random kernels because they are neat
-  def save_kernel(self):
-    with open("kernels.dat", "a") as f:
-      f.write(str(np.array(self.actual_kernel, np.uint8).tolist()))
-      f.write("\n\n")
 
 
 
@@ -160,14 +128,19 @@ class rapid_life:
       self.frame_count += 1 # needed to show drawing while paused
       return
 
-    # the good stuff
-    cv2.filter2D    (self.board, -1, self.kernel, self.transforms[0])
-    cv2.threshold   (self.transforms[0], 1, 1, cv2.THRESH_BINARY, self.transforms[1])
-    cv2.threshold   (self.transforms[0], 2, 1, cv2.THRESH_BINARY, self.transforms[2])
-    cv2.threshold   (self.transforms[0], 3, 1, cv2.THRESH_BINARY_INV, self.transforms[3])
-    cv2.bitwise_and (self.transforms[1], self.board, self.transforms[4])
-    cv2.bitwise_or  (self.transforms[4], self.transforms[2], self.transforms[5])
-    cv2.bitwise_and (self.transforms[5], self.transforms[3], self.board)
+    if not self.instructions: # woops, we managed to start without any instructions
+      self.add_instruction() # add default
+
+    for inst in self.instructions:
+      # the good stuff
+      cv2.filter2D    (self.board, -1, inst["kernel"], inst["transforms"][0])
+      cv2.threshold   (inst["transforms"][0], inst["rules"][0]-1, 1, cv2.THRESH_BINARY,     inst["transforms"][1])
+      cv2.threshold   (inst["transforms"][0], inst["rules"][1]-1, 1, cv2.THRESH_BINARY,     inst["transforms"][2])
+      cv2.threshold   (inst["transforms"][0], inst["rules"][2]-1, 1, cv2.THRESH_BINARY_INV, inst["transforms"][3])
+      cv2.bitwise_and (inst["transforms"][1], self.board, inst["transforms"][4])
+      cv2.bitwise_or  (inst["transforms"][4], inst["transforms"][2], inst["transforms"][5])
+      cv2.bitwise_and (inst["transforms"][5], inst["transforms"][3], self.board)
+
     self.frame_count += 1
 
     if self.auto_restart:
@@ -192,11 +165,11 @@ class rapid_life:
   # returns cv2 display ready image, numpy matrix or umat depending
   def get_image(self):
     if self.frame_count > self.t6_count: # only run this transform once per game step
-      cv2.threshold(self.board, 0, 255, cv2.THRESH_BINARY, self.transforms[6])
+      cv2.threshold(self.board, 0, 255, cv2.THRESH_BINARY, self.instructions[-1]["transforms"][6])
       self.t6_count = self.frame_count
     if self.recording:
-      self.video_out.write( cv2.cvtColor(self.transforms[6], cv2.COLOR_GRAY2BGR) )
-    return self.transforms[6]
+      self.video_out.write( cv2.cvtColor(self.instructions[-1]["transforms"][6], cv2.COLOR_GRAY2BGR) )
+    return self.instructions[-1]["transforms"][6]
 
 
 
