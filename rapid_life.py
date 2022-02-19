@@ -368,7 +368,8 @@ class rapid_life:
   def run(self, randomize=True):
     if randomize:
       self.randomize_board()
-    for image in self.yield_images():
+    while not self.stopped:
+      self.step_forward()
       self.display_board()
 
 
