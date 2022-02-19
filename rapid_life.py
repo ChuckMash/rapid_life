@@ -24,6 +24,7 @@ class rapid_life:
     self.save_endgames      = False      # will save the endgame state, usefull for validating auto_restart endgame detection
     self.recording_fps      = 60         # FPS to use when recording
     self.discard_first_n    = 0          # disgard the first n number of game frames after board randomization
+    self.display_every_nth  = 0          # only show every nth step for display, 0 is every frame.
 
     self.key_commands = { # function storage for keyboard commands, allows user to define new or override existing command callbacks
       27:  self.stop,             # ESC key, quits game
@@ -208,6 +209,9 @@ class rapid_life:
 
   # Displays the game board, or passed argument
   def display_board(self, image=None):
+    if self.display_every_nth:
+      if self.frame_count % self.display_every_nth != 0:
+        return
     if not self.displaying:
       self.init_display()
     if image is None:
@@ -383,4 +387,3 @@ class rapid_life:
 if __name__ == "__main__":
   life = rapid_life()
   life.run()
-
