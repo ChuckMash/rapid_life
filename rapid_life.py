@@ -23,6 +23,7 @@ class rapid_life:
     self.ar_match_limit     = 5          # number of times current game frame can appear in recent frames before calling a game over
     self.save_endgames      = False      # will save the endgame state, usefull for validating auto_restart endgame detection
     self.recording_fps      = 60         # FPS to use when recording
+    self.discard_first_n    = 0          # disgard the first n number of game frames after board randomization
 
     self.key_commands = { # function storage for keyboard commands, allows user to define new or override existing command callbacks
       27:  self.stop,             # ESC key, quits game
@@ -109,6 +110,8 @@ class rapid_life:
   # overrides the current game board state with randomized values
   def randomize_board(self, p=None):
     self.board = self.random_value(p=p)
+    for i in range(self.discard_first_n):
+      self.step_forward()
 
 
 
@@ -380,3 +383,4 @@ class rapid_life:
 if __name__ == "__main__":
   life = rapid_life()
   life.run()
+
