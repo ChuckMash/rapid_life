@@ -1,4 +1,3 @@
-
 import time
 import os
 import random
@@ -11,7 +10,7 @@ from hashlib import sha1
 
 class rapid_life:
 
-  def __init__(self, use_umat=True, res=(1920,1080), fullscreen=False, drawing=True, auto_restart=False):
+  def __init__(self, use_umat=True, res=(1920,1080), display_res=None, fullscreen=False, drawing=True, auto_restart=False):
     ###
     self.display_name       = "Rapid Life"
     self.save_dir           = "./saves"
@@ -42,6 +41,7 @@ class rapid_life:
     self.fullscreen    = fullscreen   # True/False for fullscreen display
     self.drawing       = drawing      # True/False for enabling the draw on game board feature
     self.auto_restart  = auto_restart # will try and detect if the game is over and reset. Somewhat lowers performance.
+    self.display_res   = display_res
     self.stopped       = False        # Full stop, set to True to quit
     self.paused        = False        # temp stop, pause game board progression
     self.displaying    = False
@@ -55,6 +55,7 @@ class rapid_life:
     self.latest_save   = None
     self.save_dir      = os.path.abspath(self.save_dir)+"/"
     self.instructions  = []
+    self.change_res    = not display_res in [None, res]
 
 
 
@@ -167,8 +168,13 @@ class rapid_life:
     if self.frame_count > self.t6_count: # only run this transform once per game step
       cv2.threshold(self.board, 0, 255, cv2.THRESH_BINARY, self.instructions[-1]["transforms"][6])
       self.t6_count = self.frame_count
+
     if self.recording:
       self.video_out.write( cv2.cvtColor(self.instructions[-1]["transforms"][6], cv2.COLOR_GRAY2BGR) )
+
+    if self.change_res:
+      return cv2.resize(self.instructions[-1]["transforms"][6], self.display_res, interpolation=cv2.INTER_NEAREST)
+
     return self.instructions[-1]["transforms"][6]
 
 
@@ -250,6 +256,9 @@ class rapid_life:
   # This function deals with the callback for mouse events if drawing
   def draw(self, event, x, y, flags, param):
     if flags == self.draw_on:
+      if self.change_res: # xy needs to be translated
+        x = int( self.res[0] * x / self.display_res[0] )
+        y = int( self.res[1] * y / self.display_res[1] )
       self.board = cv2.circle(self.board, (x,y), self.drawing_radius, 1, self.drawing_thickness, self.drawing_line_type, 0)
 
 
@@ -371,4 +380,3 @@ class rapid_life:
 if __name__ == "__main__":
   life = rapid_life()
   life.run()
-
