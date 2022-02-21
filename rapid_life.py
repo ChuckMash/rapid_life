@@ -14,7 +14,7 @@ class rapid_life:
     ###
     self.display_name       = "Rapid Life"
     self.save_dir           = "./saves"
-    self.draw_on            = 4          # Mouse button to draw with
+    self.draw_on            = 4          # Mouse button to draw with, set to -1 for always draw on mouse movement
     self.default_rprob      = 0.8        # default probability for random boards. Value can be 0.0 - 1.0
     self.drawing_radius     = 5          # how large to draw the circle
     self.drawing_thickness  = 1          # how thick the line of the circle, can be negative to infill
@@ -263,7 +263,7 @@ class rapid_life:
 
   # This function deals with the callback for mouse events if drawing
   def draw(self, event, x, y, flags, param):
-    if flags == self.draw_on:
+    if flags == self.draw_on or self.draw_on == -1:
       if self.change_res: # xy needs to be translated
         x = int( self.res[0] * x / self.display_res[0] )
         y = int( self.res[1] * y / self.display_res[1] )
