@@ -72,12 +72,13 @@ class rapid_life:
 
 
   # Adds a pair of rules and neighborhood
-  def add_instruction(self, rules=[2,3,4], neighborhood=[[1,1,1],[1,0,1],[1,1,1]]):
+  def add_instruction(self, rules=[2,3,4], neighborhood=[[1,1,1],[1,0,1],[1,1,1]], anchor=(-1,-1)):
     data                 = {}
     data["rules"]        = rules
     data["neighborhood"] = neighborhood
     data["transforms"]   = [ self.zero_value() for i in range(7) ]
     data["kernel"]       = np.array(neighborhood, np.uint8)
+    data["anchor"]       = anchor
     if self.use_umat:
       data["kernel"] = cv2.UMat(data["kernel"])
     self.instructions.append(data)
@@ -138,7 +139,7 @@ class rapid_life:
 
     for inst in self.instructions:
       # the good stuff
-      cv2.filter2D    (self.board, -1, inst["kernel"], inst["transforms"][0])
+      cv2.filter2D    (self.board, -1, inst["kernel"], inst["transforms"][0], inst["anchor"])
       cv2.threshold   (inst["transforms"][0], inst["rules"][0]-1, 1, cv2.THRESH_BINARY,     inst["transforms"][1])
       cv2.threshold   (inst["transforms"][0], inst["rules"][1]-1, 1, cv2.THRESH_BINARY,     inst["transforms"][2])
       cv2.threshold   (inst["transforms"][0], inst["rules"][2]-1, 1, cv2.THRESH_BINARY_INV, inst["transforms"][3])
