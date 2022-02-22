@@ -43,7 +43,7 @@ class rapid_life:
     self.fullscreen    = fullscreen   # True/False for fullscreen display
     self.drawing       = drawing      # True/False for enabling the draw on game board feature
     self.auto_restart  = auto_restart # will try and detect if the game is over and reset. Somewhat lowers performance.
-    self.display_res   = display_res
+    self.display_res   = display_res  # The resolution to display the board as, if different than processing res
     self.stopped       = False        # Full stop, set to True to quit
     self.paused        = False        # temp stop, pause game board progression
     self.displaying    = False
@@ -72,15 +72,18 @@ class rapid_life:
 
 
   # Adds a pair of rules and neighborhood
-  def add_instruction(self, rules=[2,3,4], neighborhood=[[1,1,1],[1,0,1],[1,1,1]], anchor=(-1,-1)):
+  def add_instruction(self, rules=[2,3,4], neighborhood=[[1,1,1],[1,0,1],[1,1,1]], anchor=(-1,-1), interval=1, count_offset=0):
     data                 = {}
     data["rules"]        = rules
     data["neighborhood"] = neighborhood
     data["transforms"]   = [ self.zero_value() for i in range(7) ]
     data["kernel"]       = np.array(neighborhood, np.uint8)
     data["anchor"]       = anchor
+    data["interval"]     = interval
+    data["count_offset"] = count_offset
     if self.use_umat:
       data["kernel"] = cv2.UMat(data["kernel"])
+    data["id"] = len(self.instructions)
     self.instructions.append(data)
 
 
@@ -137,15 +140,21 @@ class rapid_life:
     if not self.instructions: # woops, we managed to start without any instructions
       self.add_instruction() # add default
 
+    #activated_instructions = []
+
     for inst in self.instructions:
-      # the good stuff
-      cv2.filter2D    (self.board, -1, inst["kernel"], inst["transforms"][0], inst["anchor"])
-      cv2.threshold   (inst["transforms"][0], inst["rules"][0]-1, 1, cv2.THRESH_BINARY,     inst["transforms"][1])
-      cv2.threshold   (inst["transforms"][0], inst["rules"][1]-1, 1, cv2.THRESH_BINARY,     inst["transforms"][2])
-      cv2.threshold   (inst["transforms"][0], inst["rules"][2]-1, 1, cv2.THRESH_BINARY_INV, inst["transforms"][3])
-      cv2.bitwise_and (inst["transforms"][1], self.board, inst["transforms"][4])
-      cv2.bitwise_or  (inst["transforms"][4], inst["transforms"][2], inst["transforms"][5])
-      cv2.bitwise_and (inst["transforms"][5], inst["transforms"][3], self.board)
+      if (self.frame_count + inst["count_offset"]) % inst["interval"] == 0:
+        #activated_instructions.append(inst["id"])
+        # the good stuff
+        cv2.filter2D    (self.board, -1, inst["kernel"], inst["transforms"][0], inst["anchor"])
+        cv2.threshold   (inst["transforms"][0], inst["rules"][0]-1, 1, cv2.THRESH_BINARY,     inst["transforms"][1])
+        cv2.threshold   (inst["transforms"][0], inst["rules"][1]-1, 1, cv2.THRESH_BINARY,     inst["transforms"][2])
+        cv2.threshold   (inst["transforms"][0], inst["rules"][2]-1, 1, cv2.THRESH_BINARY_INV, inst["transforms"][3])
+        cv2.bitwise_and (inst["transforms"][1], self.board, inst["transforms"][4])
+        cv2.bitwise_or  (inst["transforms"][4], inst["transforms"][2], inst["transforms"][5])
+        cv2.bitwise_and (inst["transforms"][5], inst["transforms"][3], self.board)
+
+    #print("instructions_used",activated_instructions) # Can help see when periodic instructions
 
     self.frame_count += 1
 
