@@ -33,7 +33,8 @@ class rapid_life:
       114: self.randomize_board,  # r key, randomizes game board entirely
       115: self.save_board,       # s key
       108: self.load_board,       # l key
-      13:  self.toggle_record     # enter to record / stop reccord
+      13:  self.toggle_record,    # enter to record / stop reccord
+      110: self.step_and_display  # n key, next step when paused
       }
 
     ### Nothing to change here.
@@ -71,26 +72,73 @@ class rapid_life:
 
 
 
-  # Adds a pair of rules and neighborhood
-  def add_instruction(self, rules=[2,3,4], neighborhood=[[1,1,1],[1,0,1],[1,1,1]], anchor=(-1,-1), interval=1, count_offset=0):
+  # Instructions for the alternate approach to processing, much much faster
+  def add_instruction(self, rules=[[3],[2,3]], offset=125, neighborhood=[[1,1,1],[1,0,1],[1,1,1]], anchor=(-1,-1), interval=1, count_offset=0):
+
+    if len(rules) == 3: # Convert old style ruleset to new style
+      if rules[0] <= rules[1]:
+        birth=list(range(rules[1], rules[2]))
+        survive=list(range(rules[0], rules[2]))
+      elif rules[0] >= rules[1] <= rules[2]:
+        birth=list(range(rules[1], rules[2]))
+        survive=list(range(rules[1], rules[2]))
+      elif rules[0] > rules[1] > rules[2]:
+        print("invalid ruleset?")
+        return False
+      print(rules, "becomes", [birth, survive])
+
+    elif len(rules) == 2:
+      birth = rules[0]
+      survive = rules[1]
+
+    # check out of bounds
+    if any(i > offset for i in birth+survive):
+      print("Birth/Survive settings cannot be higher than offset.")
+      return
+
     data                 = {}
-    data["rules"]        = rules
+    data["id"]           = len(self.instructions)
+    data["type"]         = 1
     data["neighborhood"] = neighborhood
-    data["transforms"]   = [ self.zero_value() for i in range(7) ]
-    data["kernel"]       = np.array(neighborhood, np.uint8)
-    data["anchor"]       = anchor
+    data["transforms"]   = [self.zero_value(), self.zero_value()]
+    data["kernel"]       = np.array(data["neighborhood"], np.uint8)
+    data["anchor"]       = (anchor[0], anchor[1])
     data["interval"]     = interval
     data["count_offset"] = count_offset
+
+    # if anchor is default, find the actual location in kernel
+    if data["anchor"] == (-1, -1):
+      ks = np.array(data["kernel"].shape)
+      hks = (ks-1)/2
+      data["anchor"] = (int(round(hks[0])), int(round(hks[1])))
+
+    # Set up the LUT
+    lut = [0]*256
+    for b in birth:
+      lut[b] = 1
+    for s in survive:
+      lut[s+offset] = 1
+
+    # Apply the offset to the anchor
+    try:
+      data["kernel"][data["anchor"]] = data["kernel"][data["anchor"]]+offset
+    except Exception as e: # anchor is outside the kernel
+      pass
+
+    # add the lut
+    data["LUT"] = np.array(lut, np.uint8)
+
     if self.use_umat:
       data["kernel"] = cv2.UMat(data["kernel"])
-    data["id"] = len(self.instructions)
+      data["LUT"]    = cv2.UMat(data["LUT"])
+
     self.instructions.append(data)
 
 
 
   # blank it all out
   def reset_board(self):
-    self.board      = self.zero_value()
+    self.board = self.zero_value()
 
 
 
@@ -140,21 +188,12 @@ class rapid_life:
     if not self.instructions: # woops, we managed to start without any instructions
       self.add_instruction() # add default
 
-    #activated_instructions = []
-
     for inst in self.instructions:
       if (self.frame_count + inst["count_offset"]) % inst["interval"] == 0:
-        #activated_instructions.append(inst["id"])
-        # the good stuff
-        cv2.filter2D    (self.board, -1, inst["kernel"], inst["transforms"][0], inst["anchor"])
-        cv2.threshold   (inst["transforms"][0], inst["rules"][0]-1, 1, cv2.THRESH_BINARY,     inst["transforms"][1])
-        cv2.threshold   (inst["transforms"][0], inst["rules"][1]-1, 1, cv2.THRESH_BINARY,     inst["transforms"][2])
-        cv2.threshold   (inst["transforms"][0], inst["rules"][2]-1, 1, cv2.THRESH_BINARY_INV, inst["transforms"][3])
-        cv2.bitwise_and (inst["transforms"][1], self.board, inst["transforms"][4])
-        cv2.bitwise_or  (inst["transforms"][4], inst["transforms"][2], inst["transforms"][5])
-        cv2.bitwise_and (inst["transforms"][5], inst["transforms"][3], self.board)
 
-    #print("instructions_used",activated_instructions) # Can help see when periodic instructions
+        # just the good stuff
+        cv2.filter2D(self.board, -1, inst["kernel"], inst["transforms"][0], inst["anchor"])
+        cv2.LUT(inst["transforms"][0], inst["LUT"], self.board)
 
     self.frame_count += 1
 
@@ -177,23 +216,20 @@ class rapid_life:
 
 
 
-  # returns cv2 display ready image, numpy matrix or umat depending
+  # Returns cv2 display ready image, numpy matrix or UMat depending
   def get_image(self):
     if self.frame_count > self.t6_count: # only run this transform once per game step
-      cv2.threshold(self.board, 0, 255, cv2.THRESH_BINARY, self.instructions[-1]["transforms"][6])
+      cv2.threshold(self.board, 0, 255, cv2.THRESH_BINARY, self.instructions[-1]["transforms"][-1]) # stash the converted image in the last slot
       self.t6_count = self.frame_count
 
     if self.recording:
-      self.video_out.write( cv2.cvtColor(self.instructions[-1]["transforms"][6], cv2.COLOR_GRAY2BGR) )
+      self.video_out.write( self.instructions[-1]["transforms"][-1] )
 
-    if self.change_res:
-      return cv2.resize(self.instructions[-1]["transforms"][6], self.display_res, interpolation=cv2.INTER_NEAREST)
-
-    return self.instructions[-1]["transforms"][6]
+    return self.instructions[-1]["transforms"][-1]
 
 
 
-  # returns np matrix of game board
+  # Returns np matrix of game board
   def get_board(self):
     if self.use_umat: # maybe use instance check instead
       return cv2.UMat.get(self.board) # store this somewhere in case we get it more than once
@@ -249,12 +285,18 @@ class rapid_life:
     if self.fullscreen:
       options |= cv2.WND_PROP_FULLSCREEN
     else:
-      options |= cv2.WINDOW_AUTOSIZE # lets the window do whatever
+      if self.change_res:
+        options |= cv2.WINDOW_KEEPRATIO
+      else:
+        options |= cv2.WINDOW_AUTOSIZE # lets the window do whatever
 
     cv2.namedWindow(self.display_name, options)
 
     if self.fullscreen:
       cv2.setWindowProperty(self.display_name,cv2.WND_PROP_FULLSCREEN,cv2.WINDOW_FULLSCREEN)
+
+    elif self.change_res:
+      cv2.resizeWindow(self.display_name, self.display_res[0], self.display_res[1])
 
     if self.drawing:
       cv2.setMouseCallback(self.display_name, self.draw)
@@ -273,9 +315,6 @@ class rapid_life:
   # This function deals with the callback for mouse events if drawing
   def draw(self, event, x, y, flags, param):
     if flags == self.draw_on or self.draw_on == -1:
-      if self.change_res: # xy needs to be translated
-        x = int( self.res[0] * x / self.display_res[0] )
-        y = int( self.res[1] * y / self.display_res[1] )
       self.board = cv2.circle(self.board, (x,y), self.drawing_radius, 1, self.drawing_thickness, self.drawing_line_type, 0)
 
 
@@ -352,7 +391,7 @@ class rapid_life:
       print("start recording")
       self.recording = True
       fourcc = cv2.VideoWriter_fourcc(*'MP4V')
-      self.video_out = cv2.VideoWriter("output.mp4", fourcc, self.recording_fps, self.res )
+      self.video_out = cv2.VideoWriter("output.mp4", fourcc, self.recording_fps, self.res, 0)
       return True
     else:
       print("already recording")
@@ -371,6 +410,16 @@ class rapid_life:
     else:
       print("already not recording....")
       return(False)
+
+
+
+  # When paused, step forward one game tick
+  def step_and_display(self):
+    if not self.paused: # do nothing
+      return
+    self.paused=False
+    self.step_forward()
+    self.paused=True
 
 
 
