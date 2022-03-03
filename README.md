@@ -25,6 +25,7 @@ r -> randomize the game board
 s -> export/save the game board
 l -> import/load the most recently saved game board
 enter -> Start and Stop recording video.
+n -> When paused, will advance game board 1 tick
 ```
 
 
