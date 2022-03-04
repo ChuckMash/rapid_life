@@ -7,7 +7,7 @@ res = (44,11)
 ip = "192.168.1.105" # your WLED IP address
 port = 21324
 
-rl=rapid_life.rapid_life(res=res, auto_restart=True)
+rl=rapid_life.rapid_life(res=res, detect_endgame=True)
 rl.discard_first_n = 2
 rl.default_rprob = 0.5
 rl.randomize_board()

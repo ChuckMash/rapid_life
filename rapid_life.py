@@ -10,7 +10,7 @@ from hashlib import sha1
 
 class rapid_life:
 
-  def __init__(self, use_umat=True, res=(1920,1080), display_res=None, fullscreen=False, drawing=True, auto_restart=False):
+  def __init__(self, use_umat=True, res=(1920,1080), display_res=None, fullscreen=False, drawing=True, detect_endgame=False):
     ###
     self.display_name       = "Rapid Life"
     self.save_dir           = "./saves"
@@ -20,8 +20,8 @@ class rapid_life:
     self.drawing_thickness  = 1          # how thick the line of the circle, can be negative to infill
     self.drawing_line_type  = cv2.LINE_4 # cv2.LINE_4, cv2.LINE_18, cv2.LINE_AA (4, 8, 16)
     self.ar_bucket          = 25         # number of recent game frames to keep track of to comapre against for endgame state
-    self.ar_match_limit     = 5          # number of times current game frame can appear in recent frames before calling a game over
-    self.save_endgames      = False      # will save the endgame state, usefull for validating auto_restart endgame detection
+    self.ar_match_limit     = 5          # number of times current game frame can appear in recent frames before calling an endgame
+    self.save_endgames      = False      # will save the endgame state, usefull for validating endgame detection
     self.recording_fps      = 60         # FPS to use when recording
     self.discard_first_n    = 0          # disgard the first n number of game frames after board randomization
     self.display_every_nth  = 0          # only show every nth step for display, 0 is every frame.
@@ -38,27 +38,28 @@ class rapid_life:
       }
 
     ### Nothing to change here.
-    self.start_time    = time.time()
-    self.use_umat      = use_umat     # True/False for enable/disable cv2 UMat usage (GPU)
-    self.res           = res          # (x,y) resolution
-    self.fullscreen    = fullscreen   # True/False for fullscreen display
-    self.drawing       = drawing      # True/False for enabling the draw on game board feature
-    self.auto_restart  = auto_restart # will try and detect if the game is over and reset. Somewhat lowers performance.
-    self.display_res   = display_res  # The resolution to display the board as, if different than processing res
-    self.stopped       = False        # Full stop, set to True to quit
-    self.paused        = False        # temp stop, pause game board progression
-    self.displaying    = False
-    self.do_clear      = False
-    self.recording     = False
-    self.video_out     = None
-    self.board         = self.zero_value()
-    self.frame_count   = 0
-    self.t6_count      = 0
-    self.recent_frames = deque(maxlen=self.ar_bucket)
-    self.latest_save   = None
-    self.save_dir      = os.path.abspath(self.save_dir)+"/"
-    self.instructions  = []
-    self.change_res    = not display_res in [None, res]
+    self.start_time     = time.time()
+    self.use_umat       = use_umat       # True/False for enable/disable cv2 UMat usage (GPU)
+    self.res            = res            # (x,y) resolution
+    self.fullscreen     = fullscreen     # True/False for fullscreen display
+    self.drawing        = drawing        # True/False for enabling the draw on game board feature
+    self.detect_endgame = detect_endgame # will try and detect if the game is over and reset. Somewhat lowers performance.
+    self.endgame_style  = "quit"         # what to do at endgame restart or quit
+    self.display_res    = display_res    # The resolution to display the board as, if different than processing res
+    self.stopped        = False          # Full stop, set to True to quit
+    self.paused         = False          # temp stop, pause game board progression
+    self.displaying     = False
+    self.do_clear       = False
+    self.recording      = False
+    self.video_out      = None
+    self.board          = self.zero_value()
+    self.frame_count    = 0
+    self.t6_count       = 0
+    self.recent_frames  = deque(maxlen=self.ar_bucket)
+    self.latest_save    = None
+    self.save_dir       = os.path.abspath(self.save_dir)+"/"
+    self.instructions   = []
+    self.change_res     = not display_res in [None, res]
 
 
 
@@ -74,7 +75,6 @@ class rapid_life:
 
   # Instructions for the alternate approach to processing, much much faster
   def add_instruction(self, rules=[[3],[2,3]], offset=125, neighborhood=[[1,1,1],[1,0,1],[1,1,1]], anchor=(-1,-1), interval=1, count_offset=0):
-
     if len(rules) == 3: # Convert old style ruleset to new style
       if rules[0] <= rules[1]:
         birth=list(range(rules[1], rules[2]))
@@ -85,7 +85,7 @@ class rapid_life:
       elif rules[0] > rules[1] > rules[2]:
         print("invalid ruleset?")
         return False
-      print(rules, "becomes", [birth, survive])
+      #print(rules, "becomes", [birth, survive])
 
     elif len(rules) == 2:
       birth = rules[0]
@@ -197,7 +197,7 @@ class rapid_life:
 
     self.frame_count += 1
 
-    if self.auto_restart:
+    if self.detect_endgame:
       self.check_endgame()
 
 
@@ -212,7 +212,10 @@ class rapid_life:
       print("detected endgame")
       if self.save_endgames:
         self.save_board()
-      self.randomize_board()
+      if self.endgame_style == "quit":
+        self.stop()
+      elif self.endgame_style == "restart":
+        self.randomize_board()
 
 
 
@@ -424,22 +427,33 @@ class rapid_life:
 
 
   # Run and show the game
-  def run(self, randomize=True):
+  def run(self, randomize=True, limit=0):
     if randomize:
       self.randomize_board()
+    count = 0
     while not self.stopped:
       self.step_forward()
       self.display_board()
+      if not limit:
+        continue
+      count += 1
+      if count >= limit:
+        return
 
 
 
   # Just run the game
-  def sim(self, randomize=True):
+  def sim(self, randomize=True, limit=0):
     if randomize:
       self.randomize_board()
+    count = 0
     while not self.stopped:
       self.step_forward()
-
+      if not limit:
+        continue
+      count += 1
+      if count >= limit:
+        return
 
 
 
