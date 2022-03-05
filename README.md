@@ -6,20 +6,6 @@ Game of Life
 [Demonstration: Drawing](https://youtu.be/kAJRX6KEesM?t=14)
 
 [Demonstration: Game of Life with WLED](https://www.youtube.com/watch?v=1x5Vtu8NZeU)
-
-![1](https://i.imgur.com/YitvZJw.gif)
-
-![2](https://i.imgur.com/06Rg06I.gif)
-
-![3](https://i.imgur.com/c2wkjpb.gif)
-
-![4](https://i.imgur.com/9NlO5pA.gif)
-
-![5](https://i.imgur.com/Q2hhceL.gif)
-
-![6](https://i.imgur.com/P9ML6re.gif)
-
-
 Run directly with python3
 >python3 rapid_life.py
 
