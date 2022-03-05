@@ -1,6 +1,5 @@
 # Just the good stuff, but shorter & faster
 import cv2, numpy as np
-import time
 
 x,y = 1920,1080
 
