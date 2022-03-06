@@ -18,10 +18,11 @@ class rapid_life:
     self.default_rprob      = 0.8        # default probability for random boards. Value can be 0.0 - 1.0
     self.drawing_radius     = 5          # how large to draw the circle
     self.drawing_thickness  = 1          # how thick the line of the circle, can be negative to infill
-    self.drawing_line_type  = cv2.LINE_4 # cv2.LINE_4, cv2.LINE_18, cv2.LINE_AA (4, 8, 16)
+    self.drawing_line_type  = cv2.LINE_4 # cv2.LINE_4, cv2.LINE_8, cv2.LINE_AA (4, 8, 16)
     self.ar_bucket          = 25         # number of recent game frames to keep track of to comapre against for endgame state
     self.ar_match_limit     = 5          # number of times current game frame can appear in recent frames before calling an endgame
     self.save_endgames      = False      # will save the endgame state, usefull for validating endgame detection
+    self.endgame_style      = "quit"     # what to do when detect endgame. restart or quit
     self.recording_fps      = 60         # FPS to use when recording
     self.discard_first_n    = 0          # disgard the first n number of game frames after board randomization
     self.display_every_nth  = 0          # only show every nth step for display, 0 is every frame.
@@ -44,7 +45,6 @@ class rapid_life:
     self.fullscreen     = fullscreen     # True/False for fullscreen display
     self.drawing        = drawing        # True/False for enabling the draw on game board feature
     self.detect_endgame = detect_endgame # will try and detect if the game is over and reset. Somewhat lowers performance.
-    self.endgame_style  = "quit"         # what to do at endgame restart or quit
     self.display_res    = display_res    # The resolution to display the board as, if different than processing res
     self.stopped        = False          # Full stop, set to True to quit
     self.paused         = False          # temp stop, pause game board progression
