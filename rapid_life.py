@@ -26,6 +26,7 @@ class rapid_life:
     self.recording_fps      = 60         # FPS to use when recording
     self.discard_first_n    = 0          # disgard the first n number of game frames after board randomization
     self.display_every_nth  = 0          # only show every nth step for display, 0 is every frame.
+    self.display_color_mode = "neighborhood"      # display color mode. False, raw, neighborhood
 
     self.key_commands = { # function storage for keyboard commands, allows user to define new or override existing command callbacks
       27:  self.stop,             # ESC key, quits game
@@ -35,7 +36,10 @@ class rapid_life:
       115: self.save_board,       # s key
       108: self.load_board,       # l key
       13:  self.toggle_record,    # enter to record / stop reccord
-      110: self.step_and_display  # n key, next step when paused
+      110: self.step_and_display, # n key, next step when paused
+      47:  self.decrease_speed,   # / key, decrease display_every_nth
+      42:  self.increase_speed,   # * key, increase display_every_nth
+      101: self.toggle_detect_end # e key, toggles on and off detect endgame
       }
 
     ### Nothing to change here.
@@ -61,11 +65,29 @@ class rapid_life:
     self.instructions   = []
     self.change_res     = not display_res in [None, res]
 
+    if self.display_color_mode == "neighborhood":
+      self.randomize_rgb_lut()
 
 
-  # Flag setting functions
-  def pause(self): self.paused   = not self.paused
-  def clear(self): self.do_clear = True
+
+  def increase_speed(self):
+    self.display_every_nth+=1
+    print("Display every %s generation" % self.display_every_nth)
+
+  def decrease_speed(self):
+    self.display_every_nth-=1
+    print("Display every %s generation" % self.display_every_nth)
+
+  def toggle_detect_end(self):
+    self.detect_endgame = not self.detect_endgame
+    print("Detect Endgame", self.detect_endgame)
+
+  def pause(self):
+    self.paused = not self.paused
+
+  def clear(self):
+    self.do_clear = True
+
   def stop(self):
     self.stopped  = True
     if self.recording:
@@ -100,11 +122,15 @@ class rapid_life:
     data["id"]           = len(self.instructions)
     data["type"]         = 1
     data["neighborhood"] = neighborhood
-    data["transforms"]   = [self.zero_value(), self.zero_value()]
+    data["transforms"]   = [self.zero_value() for i in range(3)]
     data["kernel"]       = np.array(data["neighborhood"], np.uint8)
     data["anchor"]       = (anchor[0], anchor[1])
     data["interval"]     = interval
     data["count_offset"] = count_offset
+
+    if self.display_color_mode == "neighborhood":
+      data["transforms"][1] = self.zero_value(channels=3) #cv2.UMat(np.zeros((self.res[1],self.res[0],3), np.uint8))
+      data["transforms"][-1] = self.zero_value(channels=3) #cv2.UMat(np.zeros((self.res[1],self.res[0],3), np.uint8))
 
     # if anchor is default, find the actual location in kernel
     if data["anchor"] == (-1, -1):
@@ -136,6 +162,24 @@ class rapid_life:
 
 
 
+  # Genereates and returns a random RGB LUT
+  def random_rgb_lut(self):
+    tmp = [[(0,0,0)]] # force 0 to be black
+    for i in range(0,255):
+      tmp[0].append((random.randint(0,255),random.randint(0,255),random.randint(0,255)))
+    tmp = np.array(tmp, np.uint8)
+    if self.use_umat:
+      tmp=cv2.UMat(tmp)
+    return tmp
+
+
+
+  # sets a random color lut for use with things like neighbor display color mode
+  def randomize_rgb_lut(self):
+    self.color_lut = self.random_rgb_lut()
+
+
+
   # blank it all out
   def reset_board(self):
     self.board = self.zero_value()
@@ -143,8 +187,8 @@ class rapid_life:
 
 
   # Returns cv2 umat or np matrix. All zeros, the resolution of the game board
-  def zero_value(self):
-    val = np.zeros((self.res[1], self.res[0], 1), np.uint8)
+  def zero_value(self,channels=1):
+    val = np.zeros((self.res[1], self.res[0], channels), np.uint8)
     if self.use_umat:
       return cv2.UMat(val)
     return val
@@ -162,6 +206,9 @@ class rapid_life:
 
   # overrides the current game board state with randomized values
   def randomize_board(self, p=None):
+    if self.display_color_mode == "neighborhood":
+      self.randomize_rgb_lut()
+
     self.board = self.random_value(p=p)
     for i in range(self.discard_first_n):
       self.step_forward()
@@ -221,14 +268,26 @@ class rapid_life:
 
   # Returns cv2 display ready image, numpy matrix or UMat depending
   def get_image(self):
-    if self.frame_count > self.t6_count: # only run this transform once per game step
-      cv2.threshold(self.board, 0, 255, cv2.THRESH_BINARY, self.instructions[-1]["transforms"][-1]) # stash the converted image in the last slot
+    ret_image = None
+    if self.display_color_mode == "raw":
+      ret_image = self.instructions[-1]["transforms"][0]
+
+    elif self.frame_count > self.t6_count:
+      if self.display_color_mode == "neighborhood":
+        cv2.merge((self.instructions[-1]["transforms"][0], self.instructions[-1]["transforms"][0], self.instructions[-1]["transforms"][0]), self.instructions[-1]["transforms"][1])
+        cv2.LUT( self.instructions[-1]["transforms"][1], self.color_lut, self.instructions[-1]["transforms"][-1] )
+      else:
+        cv2.threshold(self.board, 0, 255, cv2.THRESH_BINARY, self.instructions[-1]["transforms"][-1])
+
+      ret_image = self.instructions[-1]["transforms"][-1]
       self.t6_count = self.frame_count
+    else:
+      ret_image = self.instructions[-1]["transforms"][-1]
 
     if self.recording:
-      self.video_out.write( self.instructions[-1]["transforms"][-1] )
+      self.video_out.write(ret_image)
 
-    return self.instructions[-1]["transforms"][-1]
+    return ret_image
 
 
 
@@ -265,6 +324,7 @@ class rapid_life:
       self.init_display()
     if image is None:
       image = self.get_image()
+
     cv2.imshow(self.display_name, image)
     return self.parse_keyboard_response(cv2.waitKey(1))
 
@@ -391,13 +451,19 @@ class rapid_life:
   # Start recording video
   def start_recording(self):
     if not self.recording:
-      print("start recording")
+      print("Start recording")
       self.recording = True
       fourcc = cv2.VideoWriter_fourcc(*'MP4V')
-      self.video_out = cv2.VideoWriter("output.mp4", fourcc, self.recording_fps, self.res, 0)
+      is_color = 0
+
+      if self.display_color_mode in ["neighborhood"]:
+        is_color = 1
+
+      self.video_out = cv2.VideoWriter("output.mp4", fourcc, self.recording_fps, self.res, is_color)
+
       return True
     else:
-      print("already recording")
+      print("Already recording")
       return False
 
 
@@ -405,14 +471,14 @@ class rapid_life:
   # Stop recording video
   def stop_recording(self):
     if self.recording:
-      print("stop recording")
+      print("Stopped recording")
       self.video_out.release()
       self.video_out = None
       self.recording = False
-      return(True) # alternate idea, return the filename recorded
+      return True # alternate idea, return the filename recorded
     else:
-      print("already not recording....")
-      return(False)
+      print("Was not recording....")
+      return False
 
 
 

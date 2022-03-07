@@ -8,7 +8,10 @@ def benchmark(res=(1920,1080), steps=1000, display=False, use_umat=True, fullscr
   life = rapid_life.rapid_life(res=res, use_umat=use_umat, fullscreen=fullscreen)
   life.randomize_board()
   start_time = time.time()
-  life.sim(randomize=False, limit=steps)
+  if display:
+    life.run(randomize=False, limit=steps)
+  else:
+    life.sim(randomize=False, limit=steps)
   time_taken = time.time() - start_time
 
   print("\n----------------------------")
