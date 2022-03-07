@@ -285,7 +285,10 @@ class rapid_life:
       ret_image = self.instructions[-1]["transforms"][-1]
 
     if self.recording:
-      self.video_out.write(ret_image)
+      if self.change_res: # if display res is different than res, we need to resize the video recording to match display_res
+        self.video_out.write(cv2.resize(ret_image, self.display_res, interpolation=cv2.INTER_AREA))
+      else:
+       self.video_out.write(ret_image)
 
     return ret_image
 
@@ -454,12 +457,16 @@ class rapid_life:
       print("Start recording")
       self.recording = True
       fourcc = cv2.VideoWriter_fourcc(*'MP4V')
-      is_color = 0
 
+      is_color = 0
       if self.display_color_mode in ["neighborhood"]:
         is_color = 1
 
-      self.video_out = cv2.VideoWriter("output.mp4", fourcc, self.recording_fps, self.res, is_color)
+      res = self.res
+      if self.change_res:
+        res = self.display_res
+
+      self.video_out = cv2.VideoWriter("output.mp4", fourcc, self.recording_fps, res, is_color)
 
       return True
     else:
