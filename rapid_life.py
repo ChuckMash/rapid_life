@@ -26,7 +26,7 @@ class rapid_life:
     self.recording_fps      = 60         # FPS to use when recording
     self.discard_first_n    = 0          # disgard the first n number of game frames after board randomization
     self.display_every_nth  = 0          # only show every nth step for display, 0 is every frame.
-    self.display_color_mode = "neighborhood"      # display color mode. False, raw, neighborhood
+    self.display_color_mode = False      # display color mode. False, raw, neighborhood
 
     self.key_commands = { # function storage for keyboard commands, allows user to define new or override existing command callbacks
       27:  self.stop,             # ESC key, quits game
